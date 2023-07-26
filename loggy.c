@@ -5,6 +5,7 @@
 #include "loggy.h"
 #include "common.h"
 #include "keys.h"
+#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,6 +27,7 @@ void init(Loggy *l) {
   l->cx = 0;
   l->cy = 0;
   l->rowoff = 0;
+  l->coloff = 0;
   l->ncols = 0;
   l->nrows = 0;
 }
@@ -94,6 +96,10 @@ void open_file(Loggy *l, char *filename) {
 }
 
 void row_append(Loggy *l, char *s, size_t len) {
+  if (len > l->ncols) {
+    l->ncols = len;
+  }
+
   l->rows = realloc(l->rows, sizeof(Buffer) * (l->nrows + 1));
 
   int cur = l->nrows;
@@ -125,18 +131,29 @@ void refresh_screen(Loggy *l) {
 void draw_screen(Loggy *l, Buffer *b) {
   Config c = l->c;
   for (int i = 0; i < c.rows; i++) {
+    buf_append(b, "\x1b[K", 3);
+
     int offset = l->rowoff;
 
     if (offset + i < l->nrows) {
-      int len = l->rows[offset + i].len;
+      int colstart = l->coloff;
+      int len = l->rows[offset + i].len - colstart;
+
       if (len > c.cols)
         len = c.cols;
-      buf_append(b, l->rows[offset + i].data, len);
+
+      if (len < 0) {
+        colstart = 0;
+        len = 0;
+      }
+
+      assert(colstart <= l->rows[offset + i].len);
+
+      buf_append(b, &l->rows[offset + i].data[colstart], len);
     } else {
       buf_append(b, "~", 1);
     }
 
-    buf_append(b, "\x1b[K", 3);
     if (i < c.rows - 1) {
       buf_append(b, "\r\n", 2);
     }

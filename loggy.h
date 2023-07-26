@@ -17,7 +17,7 @@ typedef struct {
 typedef struct Loggy {
   Config c;
   int cx, cy;
-  int rowoff;
+  int rowoff, coloff;
   Buffer *rows;
   int nrows;
   int ncols;

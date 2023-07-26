@@ -41,6 +41,8 @@ void move_cursor(Loggy *l, char key) {
   case 'h':
     if (l->cx > 0) {
       l->cx--;
+    } else if (l->coloff > 0) {
+      l->coloff--;
     }
     break;
   case 'j':
@@ -60,6 +62,8 @@ void move_cursor(Loggy *l, char key) {
   case 'l':
     if (l->cx < l->c.cols - 1) {
       l->cx++;
+    } else if (l->coloff + l->cx < l->ncols - 1) {
+      l->coloff++;
     }
     break;
   }
