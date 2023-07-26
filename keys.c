@@ -16,14 +16,51 @@ char read_key() {
   return buf;
 }
 
-void process_key() {
+void process_key(Loggy *l) {
   char c = read_key();
 
   switch (c) {
   case CTRL_KEY('q'):
+    write(STDOUT_FILENO, "\x1b[2J", 4);
+    write(STDOUT_FILENO, "\x1b[H", 3);
     exit(0);
     break;
+  case 'h':
+  case 'j':
+  case 'k':
+  case 'l':
+    move_cursor(l, c);
+    break;
   default:
+    break;
+  }
+}
+
+void move_cursor(Loggy *l, char key) {
+  switch (key) {
+  case 'h':
+    if (l->cx > 0) {
+      l->cx--;
+    }
+    break;
+  case 'j':
+    if (l->cy < l->c.rows - 1) {
+      l->cy++;
+    } else if (l->rowoff + l->cy < l->nrows - 1) {
+      l->rowoff++;
+    }
+    break;
+  case 'k':
+    if (l->cy > 0) {
+      l->cy--;
+    } else if (l->rowoff > 0) {
+      l->rowoff--;
+    }
+    break;
+  case 'l':
+    if (l->cx < l->c.cols - 1) {
+      l->cx++;
+    }
     break;
   }
 }

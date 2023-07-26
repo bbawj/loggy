@@ -1,3 +1,6 @@
+#ifndef LOGGY_H_
+#define LOGGY_H_
+
 #include <stddef.h>
 #include <termios.h>
 
@@ -11,8 +14,10 @@ typedef struct {
   char *data;
 } Buffer;
 
-typedef struct {
-  Config *c;
+typedef struct Loggy {
+  Config c;
+  int cx, cy;
+  int rowoff;
   Buffer *rows;
   int nrows;
   int ncols;
@@ -31,3 +36,5 @@ void row_append(Loggy *l, char *s, size_t len);
 void draw_screen(Loggy *l, Buffer *buf);
 void refresh_screen(Loggy *l);
 void clear_screen(Buffer *buf);
+
+#endif // LOGGY_H_

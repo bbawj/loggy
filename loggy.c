@@ -16,13 +16,16 @@
 struct termios original_termios;
 
 void init(Loggy *l) {
-  if (get_window_size(&l->c->rows, &l->c->cols) == -1) {
+  if (get_window_size(&l->c.rows, &l->c.cols) == -1) {
     die("get_window_size");
   }
 
   enable_raw_mode();
 
   l->rows = NULL;
+  l->cx = 0;
+  l->cy = 0;
+  l->rowoff = 0;
   l->ncols = 0;
   l->nrows = 0;
 }
@@ -109,28 +112,32 @@ void refresh_screen(Loggy *l) {
 
   draw_screen(l, &temp);
 
-  buf_append(&temp, "\x1b[H", 3);
-  buf_append(&temp, "\x1b[?25l", 6);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", l->cy + 1, l->cx + 1);
+  buf_append(&temp, buf, strlen(buf));
+
+  buf_append(&temp, "\x1b[?25h", 6);
 
   write(STDOUT_FILENO, temp.data, temp.len);
   free(temp.data);
 }
 
 void draw_screen(Loggy *l, Buffer *b) {
-  Config *c = l->c;
-  for (int i = 0; i < c->rows; i++) {
+  Config c = l->c;
+  for (int i = 0; i < c.rows; i++) {
+    int offset = l->rowoff;
 
-    if (i < l->nrows) {
-      int len = l->rows[i].len;
-      if (len > c->cols)
-        len = c->cols;
-      buf_append(b, l->rows[i].data, len);
+    if (offset + i < l->nrows) {
+      int len = l->rows[offset + i].len;
+      if (len > c.cols)
+        len = c.cols;
+      buf_append(b, l->rows[offset + i].data, len);
     } else {
       buf_append(b, "~", 1);
     }
 
     buf_append(b, "\x1b[K", 3);
-    if (i < c->rows - 1) {
+    if (i < c.rows - 1) {
       buf_append(b, "\r\n", 2);
     }
   }
@@ -151,7 +158,7 @@ int main(int argc, char *argv[]) {
 
   while (1) {
     refresh_screen(&l);
-    process_key();
+    process_key(&l);
   }
 
   return 0;
