@@ -2,6 +2,7 @@
 #include "common.h"
 #include "loggy.h"
 #include <errno.h>
+#include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -31,6 +32,7 @@ void process_key_normal(Loggy *l) {
   case 'j':
   case 'k':
   case 'l':
+  case 'n':
     move_cursor(l, c);
     break;
   case 'G': {
@@ -93,6 +95,30 @@ void move_cursor(Loggy *l, char key) {
       l->coloff++;
     }
     break;
+  case 'n': {
+    Matches m = l->matches;
+    if (m.len == 0) {
+      break;
+    }
+
+    Match cur_match = m.matches[m.cur];
+    int cur_row = l->cy + l->rowoff;
+    if (cur_match.row >= cur_row) {
+      l->rowoff = cur_match.row - cur_row;
+    } else {
+      l->cy = cur_row - cur_match.row;
+    }
+
+    if (cur_match.regmatch.rm_so >= l->c.cols) {
+      int linelen = l->rows[cur_match.row].len;
+      l->cx = l->c.cols;
+      l->coloff = linelen - l->c.cols;
+    } else {
+      l->cx = cur_match.regmatch.rm_so;
+    }
+    l->matches.cur =
+        l->matches.cur + 1 == l->matches.len ? 0 : ++l->matches.cur;
+  } break;
   }
 }
 
@@ -104,6 +130,16 @@ void process_key_search(Loggy *l) {
     l->mode = NORMAL;
     clear_status_message(l);
     break;
+  case 0xd: {
+    l->mode = NORMAL;
+    int flags = 0;
+    regex_t search_regex;
+    if (regcomp(&search_regex, l->status_message.data, flags)) {
+      die("regcomp");
+    }
+    find(l, search_regex);
+    clear_status_message(l);
+  } break;
   default:
     if (l->status_message.len + 1 > l->c.cols) {
       break;

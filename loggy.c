@@ -24,6 +24,8 @@ void init(Loggy *l) {
 
   enable_raw_mode();
 
+  l->matches = (Matches){.matches = NULL, .len = 0, .cur = 0};
+
   char status_buffer[l->c.cols];
   l->status_message = (Buffer){.len = 0, .data = malloc(sizeof(status_buffer))};
   l->mode = NORMAL;
@@ -122,6 +124,7 @@ void row_append(Loggy *l, char *s, size_t len) {
   l->nrows++;
 }
 
+// /row
 void refresh_screen(Loggy *l) {
   Buffer temp = {0, NULL};
   buf_append(&temp, "\x1b[?25l", 6);
@@ -137,6 +140,24 @@ void refresh_screen(Loggy *l) {
 
   write(STDOUT_FILENO, temp.data, temp.len);
   free(temp.data);
+}
+
+void find(Loggy *l, regex_t reg) {
+  for (int i = 0; i < l->nrows; i++) {
+    regmatch_t pmatch[1];
+
+    char *cur_line = l->rows[i].data;
+    regoff_t off, length;
+    if (regexec(&reg, cur_line, sizeof(pmatch) / sizeof(pmatch[0]), pmatch,
+                0)) {
+      continue;
+    }
+    l->matches.matches =
+        realloc(l->matches.matches, sizeof(Match) * (l->matches.len + 1));
+    l->matches.matches[l->matches.len] =
+        (Match){.regmatch = pmatch[0], .row = i};
+    l->matches.len++;
+  }
 }
 
 void draw_screen(Loggy *l, Buffer *b) {

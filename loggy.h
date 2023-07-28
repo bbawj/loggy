@@ -1,6 +1,7 @@
 #ifndef LOGGY_H_
 #define LOGGY_H_
 
+#include <regex.h>
 #include <stddef.h>
 #include <termios.h>
 
@@ -16,11 +17,25 @@ typedef struct {
   char *data;
 } Buffer;
 
+typedef struct {
+  regmatch_t regmatch;
+  int row;
+} Match;
+
+typedef struct {
+  int cur;
+  int len;
+  Match *matches;
+} Matches;
+
 typedef struct Loggy {
   Config c;
   mode mode;
   char *filename;
   Buffer status_message;
+
+  Matches matches;
+
   int cx, cy;
   int rowoff, coloff;
   Buffer *rows;
@@ -43,5 +58,6 @@ void draw_status_bar(Loggy *l, Buffer *b);
 void draw_status_message(Loggy *l, Buffer *b, char *status_message);
 void clear_status_message(Loggy *l);
 void refresh_screen(Loggy *l);
+void find(Loggy *l, regex_t reg);
 
 #endif // LOGGY_H_
