@@ -1,6 +1,8 @@
 #include "keys.h"
 #include "common.h"
+#include "loggy.h"
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -16,7 +18,7 @@ char read_key() {
   return buf;
 }
 
-void process_key(Loggy *l) {
+void process_key_normal(Loggy *l) {
   char c = read_key();
 
   switch (c) {
@@ -30,6 +32,31 @@ void process_key(Loggy *l) {
   case 'k':
   case 'l':
     move_cursor(l, c);
+    break;
+  case 'G': {
+    int times = l->nrows - l->cy;
+    while (times > 0) {
+      move_cursor(l, 'j');
+      times--;
+    }
+  } break;
+  case '0':
+    l->coloff = 0;
+    l->cx = 0;
+    break;
+  case '$': {
+    int linelen = l->rows[l->rowoff + l->cy].len;
+    l->coloff = linelen - l->c.cols;
+    if (l->coloff < 0)
+      l->coloff = 0;
+    l->cx = linelen - l->coloff - 1;
+    if (l->cx < 0)
+      l->cx = 0;
+  } break;
+  case '/':
+    l->mode = SEARCH;
+    l->status_message.data[0] = '/';
+    l->status_message.len++;
     break;
   default:
     break;
@@ -65,6 +92,23 @@ void move_cursor(Loggy *l, char key) {
     } else if (l->coloff + l->cx < l->ncols - 1) {
       l->coloff++;
     }
+    break;
+  }
+}
+
+void process_key_search(Loggy *l) {
+  char c = read_key();
+
+  switch (c) {
+  case 0x1b:
+    l->mode = NORMAL;
+    clear_status_message(l);
+    break;
+  default:
+    if (l->status_message.len + 1 > l->c.cols) {
+      break;
+    }
+    l->status_message.data[l->status_message.len++] = c;
     break;
   }
 }

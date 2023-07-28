@@ -20,9 +20,15 @@ void init(Loggy *l) {
   if (get_window_size(&l->c.rows, &l->c.cols) == -1) {
     die("get_window_size");
   }
+  l->c.rows -= 2;
 
   enable_raw_mode();
 
+  char status_buffer[l->c.cols];
+  l->status_message = (Buffer){.len = 0, .data = malloc(sizeof(status_buffer))};
+  l->mode = NORMAL;
+
+  l->filename = NULL;
   l->rows = NULL;
   l->cx = 0;
   l->cy = 0;
@@ -55,6 +61,8 @@ void disable_raw_mode() {
 }
 
 void buf_append(Buffer *buf, const char *s, int len) {
+  if (len == 0)
+    return;
   char *new = realloc(buf->data, buf->len + len);
   if (new == NULL) {
     return;
@@ -77,6 +85,9 @@ int get_window_size(int *rows, int *cols) {
 }
 
 void open_file(Loggy *l, char *filename) {
+  free(l->filename);
+  l->filename = strdup(filename);
+
   FILE *fp = fopen(filename, "r");
   if (!fp) {
     die("fopen");
@@ -130,13 +141,14 @@ void refresh_screen(Loggy *l) {
 
 void draw_screen(Loggy *l, Buffer *b) {
   Config c = l->c;
+
   for (int i = 0; i < c.rows; i++) {
     buf_append(b, "\x1b[K", 3);
 
+    int colstart = l->coloff;
     int offset = l->rowoff;
 
     if (offset + i < l->nrows) {
-      int colstart = l->coloff;
       int len = l->rows[offset + i].len - colstart;
 
       if (len > c.cols)
@@ -154,15 +166,50 @@ void draw_screen(Loggy *l, Buffer *b) {
       buf_append(b, "~", 1);
     }
 
-    if (i < c.rows - 1) {
-      buf_append(b, "\r\n", 2);
+    buf_append(b, "\r\n", 2);
+  }
+
+  draw_status_bar(l, b);
+  draw_status_message(l, b, "");
+}
+
+void draw_status_bar(Loggy *l, Buffer *b) {
+  buf_append(b, "\x1b[7m", 4);
+
+  char left_status[80];
+  int len = snprintf(left_status, sizeof(left_status), "%.20s",
+                     l->filename ? l->filename : "[No Name]");
+  if (len > l->c.cols)
+    len = l->c.cols;
+  char right_status[l->c.cols - len];
+  int rlen = snprintf(right_status, sizeof(right_status), "%d lines", l->nrows);
+  buf_append(b, left_status, len);
+  while (len < l->c.cols) {
+    if (len + rlen == l->c.cols) {
+      buf_append(b, right_status, rlen);
+      break;
+    } else {
+      buf_append(b, " ", 1);
+      len++;
     }
+  }
+
+  buf_append(b, "\x1b[m", 3);
+}
+
+void draw_status_message(Loggy *l, Buffer *b, char *status_message) {
+  buf_append(b, l->status_message.data, l->status_message.len);
+  int padding = l->c.cols - l->status_message.len;
+  while (padding > 0) {
+    buf_append(b, " ", 1);
+    padding--;
   }
 }
 
-void clear_screen(Buffer *b) {
-  buf_append(b, "\x1b[2J", 4);
-  buf_append(b, "\x1b[H", 3);
+void clear_status_message(Loggy *l) {
+  free(l->status_message.data);
+  char status_buffer[l->c.cols];
+  l->status_message = (Buffer){.len = 0, .data = malloc(sizeof(status_buffer))};
 }
 
 int main(int argc, char *argv[]) {
@@ -175,7 +222,16 @@ int main(int argc, char *argv[]) {
 
   while (1) {
     refresh_screen(&l);
-    process_key(&l);
+    switch (l.mode) {
+    case NORMAL:
+      process_key_normal(&l);
+      break;
+    case SEARCH:
+      process_key_search(&l);
+      break;
+    default:
+      break;
+    }
   }
 
   return 0;
