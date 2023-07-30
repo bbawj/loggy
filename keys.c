@@ -103,19 +103,21 @@ void move_cursor(Loggy *l, char key) {
 
     Match cur_match = m.matches[m.cur];
     int cur_row = l->cy + l->rowoff;
-    if (cur_match.row >= cur_row) {
-      l->rowoff = cur_match.row - cur_row;
+    int rows_needed = cur_match.row - cur_row;
+    if (abs(rows_needed) > l->c.rows - 1) {
+      l->rowoff += rows_needed;
     } else {
-      l->cy = cur_row - cur_match.row;
+      l->cy += rows_needed;
     }
 
-    if (cur_match.regmatch.rm_so >= l->c.cols) {
-      int linelen = l->rows[cur_match.row].len;
-      l->cx = l->c.cols;
-      l->coloff = linelen - l->c.cols;
+    int cur_col = l->cx + l->coloff;
+    int cols_needed = cur_match.regmatch.rm_so - cur_col;
+    if (abs(cols_needed) > l->c.cols - 1) {
+      l->coloff += cols_needed;
     } else {
-      l->cx = cur_match.regmatch.rm_so;
+      l->cx += cols_needed;
     }
+
     l->matches.cur =
         l->matches.cur + 1 == l->matches.len ? 0 : ++l->matches.cur;
   } break;
