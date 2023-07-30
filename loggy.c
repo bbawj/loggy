@@ -133,7 +133,8 @@ void refresh_screen(Loggy *l) {
   draw_screen(l, &temp);
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", l->cy + 1, l->cx + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", l->cy - l->rowoff + 1,
+           l->cx - l->coloff + 1);
   buf_append(&temp, buf, strlen(buf));
 
   buf_append(&temp, "\x1b[?25h", 6);
@@ -233,6 +234,22 @@ void clear_status_message(Loggy *l) {
   l->status_message = (Buffer){.len = 0, .data = malloc(sizeof(status_buffer))};
 }
 
+void scroll(Loggy *l) {
+  if (l->cy < l->rowoff) {
+    l->rowoff = l->cy;
+  }
+  if (l->cy >= l->rowoff + l->c.rows) {
+    l->rowoff = l->cy - l->c.rows + 1;
+  }
+
+  if (l->cx < l->coloff) {
+    l->coloff = l->cx;
+  }
+  if (l->cx >= l->coloff + l->c.cols) {
+    l->coloff = l->cx - l->c.cols + 1;
+  }
+}
+
 int main(int argc, char *argv[]) {
   Loggy l;
   init(&l);
@@ -242,6 +259,7 @@ int main(int argc, char *argv[]) {
   }
 
   while (1) {
+    scroll(&l);
     refresh_screen(&l);
     switch (l.mode) {
     case NORMAL:
