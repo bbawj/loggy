@@ -17,7 +17,7 @@
 struct termios original_termios;
 
 void init(Loggy *l) {
-  if (get_window_size(&l->c.rows, &l->c.cols) == -1) {
+  if (get_window_size(&l->c.rows, &l->c.cols) == -1) { // row
     die("get_window_size");
   }
   l->c.rows -= 2;
@@ -124,7 +124,6 @@ void row_append(Loggy *l, char *s, size_t len) {
   l->nrows++;
 }
 
-// /row
 void refresh_screen(Loggy *l) {
   Buffer temp = {0, NULL};
   buf_append(&temp, "\x1b[?25l", 6);
@@ -148,16 +147,17 @@ void find(Loggy *l, regex_t reg) {
     regmatch_t pmatch[1];
 
     char *cur_line = l->rows[i].data;
-    regoff_t off, length;
-    if (regexec(&reg, cur_line, sizeof(pmatch) / sizeof(pmatch[0]), pmatch,
-                0)) {
-      continue;
+    regoff_t off = 0;
+    while ((regexec(&reg, &cur_line[off], sizeof(pmatch) / sizeof(pmatch[0]),
+                    pmatch, 0) == 0)) {
+      l->matches.matches =
+          realloc(l->matches.matches, sizeof(Match) * (l->matches.len + 1));
+      pmatch[0].rm_so += off;
+      l->matches.matches[l->matches.len] =
+          (Match){.regmatch = pmatch[0], .row = i};
+      l->matches.len++;
+      off += pmatch[0].rm_eo;
     }
-    l->matches.matches =
-        realloc(l->matches.matches, sizeof(Match) * (l->matches.len + 1));
-    l->matches.matches[l->matches.len] =
-        (Match){.regmatch = pmatch[0], .row = i};
-    l->matches.len++;
   }
 }
 

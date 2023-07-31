@@ -93,12 +93,34 @@ void move_cursor(Loggy *l, char key) {
       break;
     }
 
-    Match cur_match = m.matches[m.cur];
-    l->cy = cur_match.row;
-    l->cx = cur_match.regmatch.rm_so;
+    Match cur_match;
+    int left = 0;
+    int right = m.len - 1;
+    while (left != right) {
+      int middle = (left + right) / 2;
+      cur_match = m.matches[middle];
+      if (cur_match.row <= l->cy) {
+        left = middle + 1;
+      } else {
+        right = middle;
+      }
+    }
 
-    l->matches.cur =
-        l->matches.cur + 1 == l->matches.len ? 0 : ++l->matches.cur;
+    for (; left > 0; left--) {
+      Match cur = m.matches[left];
+      Match prev = m.matches[left - 1];
+
+      if (prev.row < l->cy ||
+          (prev.row == l->cy && prev.regmatch.rm_so <= l->cx)) {
+        l->cy = cur.row;
+        l->cx = cur.regmatch.rm_so;
+        break;
+      }
+    }
+    Match cur = m.matches[left];
+    l->cy = cur.row;
+    l->cx = cur.regmatch.rm_so;
+
   } break;
   }
 }
