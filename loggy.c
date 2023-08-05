@@ -1,18 +1,23 @@
+#include <stdarg.h>
 #define _DEFAULT_SOURCE
 #define _BSD_SOURCE
 #define _GNU_SOURCE
 
-#include "loggy.h"
 #include "common.h"
 #include "keys.h"
+#include "loggy.h"
+#include "thirdparty/cJSON.h"
 #include <assert.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 struct termios original_termios;
 
@@ -38,6 +43,53 @@ void init(Loggy *l) {
   l->coloff = 0;
   l->ncols = 0;
   l->nrows = 0;
+
+  parse_config(l, "config.json");
+}
+
+void parse_config(Loggy *l, char *path) {
+  char error[80];
+  FILE *fp = fopen(path, "r");
+  if (!fp) {
+    write_status_message(l, "Error opening config file.");
+    return;
+  }
+  char buffer[1024];
+  fread(buffer, ARRAY_SIZE(buffer), sizeof(*buffer), fp);
+  if (ferror(fp)) {
+    write_status_message(l, "Error reading config file");
+    return;
+  }
+
+  const char **parse_end;
+  cJSON *config = cJSON_Parse(buffer);
+  if (config == NULL) {
+    const char *error_ptr = cJSON_GetErrorPtr();
+    if (error_ptr != NULL) {
+      write_status_message(l, "Error parsing config file: %s", error_ptr);
+    }
+    return;
+  }
+
+  cJSON *element;
+  cJSON_ArrayForEach(element, config) {
+    int len = snprintf(error, sizeof(error), "Name: %s Value: %s",
+                       element->string, element->valuestring);
+    l->status_message.data = error;
+    l->status_message.len = len;
+  }
+
+  cJSON_Delete(config);
+}
+
+void write_status_message(Loggy *l, const char *message, ...) {
+  va_list args;
+  va_start(args, message);
+  char status_buffer[1024];
+  int len = vsnprintf(status_buffer, sizeof(status_buffer), message, args);
+  l->status_message.data = status_buffer;
+  l->status_message.len = len;
+  va_end(args);
 }
 
 void enable_raw_mode() {
@@ -148,8 +200,8 @@ void find(Loggy *l, regex_t reg) {
 
     char *cur_line = l->rows[i].data;
     regoff_t off = 0;
-    while ((regexec(&reg, &cur_line[off], sizeof(pmatch) / sizeof(pmatch[0]),
-                    pmatch, 0) == 0)) {
+    while (regexec(&reg, &cur_line[off], sizeof(pmatch) / sizeof(pmatch[0]),
+                   pmatch, 0) == 0) {
       l->matches.matches =
           realloc(l->matches.matches, sizeof(Match) * (l->matches.len + 1));
       pmatch[0].rm_so += off;
@@ -228,11 +280,7 @@ void draw_status_message(Loggy *l, Buffer *b, char *status_message) {
   }
 }
 
-void clear_status_message(Loggy *l) {
-  free(l->status_message.data);
-  char status_buffer[l->c.cols];
-  l->status_message = (Buffer){.len = 0, .data = malloc(sizeof(status_buffer))};
-}
+void clear_status_message(Loggy *l) { l->status_message.len = 0; }
 
 void scroll(Loggy *l) {
   if (l->cy < l->rowoff) {

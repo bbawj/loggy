@@ -52,6 +52,8 @@ void buf_append(Buffer *buf, const char *s, int len);
 
 void open_file(Loggy *l, char *filename);
 
+void write_status_message(Loggy *l, const char *message, ...);
+void parse_config(Loggy *l, char *path);
 void row_append(Loggy *l, char *s, size_t len);
 void draw_screen(Loggy *l, Buffer *buf);
 void draw_status_bar(Loggy *l, Buffer *b);

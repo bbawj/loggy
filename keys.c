@@ -57,8 +57,7 @@ void process_key_normal(Loggy *l) {
   } break;
   case '/':
     l->mode = SEARCH;
-    l->status_message.data[0] = '/';
-    l->status_message.len++;
+    write_status_message(l, "/");
     break;
   default:
     break;
